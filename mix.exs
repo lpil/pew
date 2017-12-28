@@ -45,7 +45,7 @@ defmodule Pew.Mixfile do
     [
       {:ecto, "~> 2.1"},
       {:postgrex, "~> 0.13"},
-      {:mix_test_watch, ">= 0.0.0", only: :dev}
+      {:mix_test_watch, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
 end

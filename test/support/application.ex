@@ -15,7 +15,8 @@ defmodule Support.Application do
 
     children = [
       # Starts a worker by calling: Thingy.Worker.start_link(arg)
-      supervisor(Pew, [pew_options])
+      Support.Repo,
+      {Pew, pew_options}
     ]
 
     opts = [strategy: :one_for_one, name: __MODULE__]
