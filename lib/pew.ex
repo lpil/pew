@@ -4,29 +4,11 @@ defmodule Pew do
 
   """
 
-  use Supervisor
+  defdelegate child_spec(args), to: Pew.Supervisor
+  defdelegate start_link(args), to: Pew.Supervisor
 
-  def start_link(arg) do
-    Supervisor.start_link(__MODULE__, arg, name: __MODULE__)
-  end
-
-  def init(opts) do
-    _repo = config_fetch!(opts, :repo)
-
-    children = [
-      # worker(Stack, [:hello])
-    ]
-
-    Supervisor.init(
-      children,
-      strategy: :one_for_one
-    )
-  end
-
-  # TODO: Use a real exception
-  defp config_fetch!(opts, key) do
-    with nil <- opts[key] do
-      raise "Pew option `#{key}` must be specified"
-    end
+  def enqueue(name, job_module, args) do
+    _repo = Pew.Manager.get_repo(name)
+    # TODO: enqueue yo
   end
 end
