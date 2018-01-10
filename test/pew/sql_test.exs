@@ -2,19 +2,15 @@ defmodule Pew.SQLTest do
   use ExUnit.Case, async: false
   alias Pew.SQL
   doctest SQL
-  import Support.DatabaseHelpers
+  import Support.Helpers
 
-  setup_all [:new_connection]
+  setup_all [:new_connection, :new_pew_tree]
 
-  describe "insert_job/2" do
+  describe "insert_job/4" do
     setup [:truncate_jobs]
 
-    test "minimal data", ctx do
-      values = %{
-        job_type: MyJob
-      }
-
-      assert :ok = SQL.insert_job(ctx.conn, values)
+    test "minimal values", ctx do
+      assert :ok = SQL.insert_job(ctx.conn, MyJob)
 
       assert [job] = list_jobs(ctx.conn)
       assert job.args == %{}
@@ -27,31 +23,45 @@ defmodule Pew.SQLTest do
     end
 
     test "all values", ctx do
-      values = %{
-        job_type: MyJobYeah,
-        args: %{},
+      options = [
         priority: 99,
         queue: "another",
         run_at: DateTime.utc_now() |> Map.put(:year, 1900)
-      }
-
-      assert :ok = SQL.insert_job(ctx.conn, values)
+      ]
+      assert :ok = SQL.insert_job(ctx.conn, MyJobYeah, %{foo: 2}, options)
 
       assert [job] = list_jobs(ctx.conn)
-      assert job.args == %{}
+      assert job.args == %{"foo" => 2}
       assert job.error_count == 0
       assert job.job_type == "Elixir.MyJobYeah"
       assert job.last_error == nil
       assert job.priority == 99
       assert job.queue == "another"
-      assert DateTime.compare(values.run_at, job.run_at) == :eq
+      assert DateTime.compare(options[:run_at], job.run_at) == :eq
     end
 
-    test "insufficient values", ctx do
-      assert_raise ArgumentError, ":job_type must be specifed", fn ->
-        SQL.insert_job(ctx.conn, [])
-      end
+    test "incorrect values", ctx do
+      ["no", 1, [], %{}]
+      |> Enum.each(fn item ->
+        assert_raise FunctionClauseError, fn ->
+          SQL.insert_job(ctx.conn, item, [])
+        end
+      end)
+
       assert [] = list_jobs(ctx.conn)
+    end
+
+    test "using Pew tree name rather than postgrex connection pid", ctx do
+      assert :ok = SQL.insert_job(__MODULE__, MyJob)
+
+      assert [job] = list_jobs(ctx.conn)
+      assert job.args == %{}
+      assert job.error_count == 0
+      assert job.job_type == "Elixir.MyJob"
+      assert job.last_error == nil
+      assert job.priority == 100
+      assert job.queue == ""
+      assert :gt == DateTime.compare(DateTime.utc_now(), job.run_at)
     end
   end
 end

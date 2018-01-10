@@ -1,6 +1,6 @@
 ExUnit.start()
 
-defmodule Support.DatabaseHelpers do
+defmodule Support.Helpers do
   def postgrex_options do
     [
       hostname: "localhost",
@@ -46,10 +46,22 @@ defmodule Support.DatabaseHelpers do
     sql = """
     SELECT * FROM pew_jobs;
     """
+
     %{columns: columns, rows: rows} = Postgrex.query!(conn, sql, [])
     atom_columns = Enum.map(columns, &String.to_atom/1)
+
     Enum.map(rows, fn row ->
       atom_columns |> Enum.zip(row) |> Enum.into(%{})
     end)
+  end
+
+  def new_pew_tree(ctx) do
+    opts = [
+      name: ctx.module,
+      postgrex_options: postgrex_options()
+    ]
+
+    {:ok, _pid} = Pew.start_link(opts)
+    {:ok, pew_name: ctx.module}
   end
 end
