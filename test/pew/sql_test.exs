@@ -28,6 +28,7 @@ defmodule Pew.SQLTest do
         queue: "another",
         run_at: DateTime.utc_now() |> Map.put(:year, 1900)
       ]
+
       assert :ok = SQL.insert_job(ctx.conn, MyJobYeah, %{foo: 2}, options)
 
       assert [job] = list_jobs(ctx.conn)
@@ -62,6 +63,48 @@ defmodule Pew.SQLTest do
       assert job.priority == 100
       assert job.queue == ""
       assert :gt == DateTime.compare(DateTime.utc_now(), job.run_at)
+    end
+  end
+
+  describe "delete_job/5" do
+    setup [:truncate_jobs]
+
+    test "job is deleted", ctx do
+      queue = "some-queu"
+      priority = 58
+      run_at = DateTime.utc_now()
+      job_type = MyJob
+      args = %{value: "ok"}
+      opts = %{queue: queue, priority: priority, run_at: run_at}
+      assert :ok = SQL.insert_job(ctx.conn, job_type, args, opts)
+      assert [%{job_id: job_id}] = list_jobs(ctx.conn)
+      assert :ok = SQL.insert_job(ctx.conn, AnotherJob, args, opts)
+      assert [_, _] = list_jobs(ctx.conn)
+      assert :ok = SQL.delete_job(ctx.conn, queue, priority, run_at, job_id)
+      assert [%{job_type: "Elixir.AnotherJob"}] = list_jobs(ctx.conn)
+      assert :ok = SQL.delete_job(ctx.conn, queue, priority, run_at, job_id)
+      assert [%{job_type: "Elixir.AnotherJob", job_id: job_id_2}] = list_jobs(ctx.conn)
+      assert :ok = SQL.delete_job(ctx.conn, queue, priority, run_at, job_id_2)
+      assert [] = list_jobs(ctx.conn)
+    end
+
+    test "using Pew tree name rather than postgrex connection pid", ctx do
+      queue = "some-queu"
+      priority = 58
+      run_at = DateTime.utc_now()
+      job_type = MyJob
+      args = %{value: "ok"}
+      opts = %{queue: queue, priority: priority, run_at: run_at}
+      assert :ok = SQL.insert_job(__MODULE__, job_type, args, opts)
+      assert [%{job_id: job_id}] = list_jobs(ctx.conn)
+      assert :ok = SQL.insert_job(__MODULE__, AnotherJob, args, opts)
+      assert [_, _] = list_jobs(ctx.conn)
+      assert :ok = SQL.delete_job(__MODULE__, queue, priority, run_at, job_id)
+      assert [%{job_type: "Elixir.AnotherJob"}] = list_jobs(ctx.conn)
+      assert :ok = SQL.delete_job(__MODULE__, queue, priority, run_at, job_id)
+      assert [%{job_type: "Elixir.AnotherJob", job_id: job_id_2}] = list_jobs(ctx.conn)
+      assert :ok = SQL.delete_job(__MODULE__, queue, priority, run_at, job_id_2)
+      assert [] = list_jobs(ctx.conn)
     end
   end
 end
