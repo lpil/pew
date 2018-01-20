@@ -28,7 +28,7 @@ defmodule Pew.Poller do
   def init(opts) do
     postgrex_opts = Keyword.get(opts, :postgrex_options)
     conn = Pew.SQL.new_database_connection!(postgrex_opts)
-    :ok = Pew.SQL.setup_database!(conn)
+    {:ok, _} = Pew.SQL.setup_database(conn, [])
     state = %__MODULE__{conn: conn}
     {:ok, state}
   end

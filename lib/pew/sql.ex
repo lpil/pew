@@ -1,6 +1,13 @@
 defmodule Pew.SQL do
   @moduledoc false
+  use Yesql, driver: Postgrex
   alias Pew.Poller
+
+  sql = &Path.join(:code.priv_dir(:pew), &1)
+
+  Yesql.defquery(sql.("setup_database.sql"))
+  Yesql.defquery(sql.("do_insert_job.sql"))
+  Yesql.defquery(sql.("do_delete_job.sql"))
 
   def new_database_connection!(postgrex_opts) do
     opts = Keyword.put(postgrex_opts, :types, Pew.PostgrexTypes)
@@ -8,78 +15,33 @@ defmodule Pew.SQL do
     conn
   end
 
-  def setup_database!(conn) do
-    sql = """
-    CREATE TABLE IF NOT EXISTS pew_jobs
-    (
-      priority    smallint    NOT NULL DEFAULT 100,
-      queue       text        NOT NULL DEFAULT '',
-      run_at      timestamptz NOT NULL DEFAULT now(),
-      job_id      bigserial   NOT NULL,
-      job_type    text        NOT NULL,
-      args        jsonb       NOT NULL DEFAULT '{}'::jsonb,
-      error_count integer     NOT NULL DEFAULT 0,
-      last_error  text,
-      CONSTRAINT pew_jobs_pkey PRIMARY KEY (queue, priority, run_at, job_id)
-    );
-    """
-
-    Postgrex.query!(conn, sql, [])
-    :ok
-  end
-
   def insert_job(conn_or_name, job_type, job_args \\ %{}, data \\ [])
 
   def insert_job(conn, job_type, job_args, options) when is_atom(job_type) do
-    sql = """
-    INSERT INTO pew_jobs
-    (queue, priority, run_at, job_type, args)
-    VALUES
-    (
-      coalesce($1, '')::text,
-      coalesce($2, 100)::smallint,
-      coalesce($3, now())::timestamptz,
-      $4::text,
-      coalesce($5, '[]')::jsonb
-    )
-    RETURNING *
-    """
-
-    values = [
-      Access.get(options, :queue),
-      Access.get(options, :priority),
-      Access.get(options, :run_at),
-      to_string(job_type),
-      Jason.encode!(job_args)
+    args = [
+      queue: Access.get(options, :queue, ""),
+      priority: Access.get(options, :priority, 100),
+      run_at: Access.get(options, :run_at, DateTime.utc_now()),
+      job_type: to_string(job_type),
+      args: Jason.encode!(job_args)
     ]
 
-    run_query(conn, sql, values)
+    conn
+    |> resolve_conn()
+    |> do_insert_job(args)
+    |> flatten_ok()
   end
 
-  def delete_job(conn, queue, priority, run_at, job_id) do
-    sql = """
-    DELETE FROM pew_jobs
-    WHERE queue    = $1::text
-    AND   priority = $2::smallint
-    AND   run_at   = $3::timestamptz
-    AND   job_id   = $4::bigint
-    """
-
-    values = [queue, priority, run_at, job_id]
-    run_query(conn, sql, values)
+  def delete_job(conn, args) do
+    conn
+    |> resolve_conn()
+    |> do_delete_job(args)
   end
 
   # TODO: Ecto version
-  defp run_query(name, sql, values) when is_atom(name) do
-    name
-    |> Poller.name()
-    |> Poller.get_conn()
-    |> run_query(sql, values)
-  end
+  defp resolve_conn(conn) when is_atom(conn), do: conn |> Poller.name() |> Poller.get_conn()
+  defp resolve_conn(conn) when is_pid(conn), do: conn
 
-  defp run_query(conn, sql, values) when is_pid(conn) do
-    with {:ok, _} <- Postgrex.query(conn, sql, values) do
-      :ok
-    end
-  end
+  defp flatten_ok({:ok, _}), do: :ok
+  defp flatten_ok(error), do: error
 end

@@ -3,36 +3,10 @@ defmodule PewTest do
   doctest Pew
   import Support.Helpers
 
-  setup_all [:new_connection, :drop_jobs_table]
-
-  describe "tree initialisation" do
-    setup [:drop_jobs_table]
-
-    test "set up of initial state", ctx do
-      name = PewTestNewTree
-
-      opts = [
-        name: name,
-        postgrex_options: postgrex_options()
-      ]
-
-      refute table_exists?(ctx.conn, "pew_jobs")
-
-      # Start tree
-      assert {:ok, _pid} = Pew.start_link(opts)
-
-      # Ensure tree is up
-      assert Pew.Supervisor.name(name) |> Process.whereis()
-      assert Pew.Poller.name(name) |> Process.whereis()
-
-      # Ensure database is configured
-      assert table_exists?(ctx.conn, "pew_jobs")
-    end
-  end
+  setup_all [:new_pew_tree, :new_connection]
+  setup [:truncate_jobs]
 
   describe "insert_job" do
-    setup [:new_pew_tree, :truncate_jobs]
-
     test "insert_job/2 delegation", ctx do
       assert :ok = Pew.insert_job(__MODULE__, MyJob)
       assert [%{job_type: "Elixir.MyJob"}] = list_jobs(ctx.conn)

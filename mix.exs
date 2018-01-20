@@ -17,7 +17,7 @@ defmodule Pew.Mixfile do
         maintainers: ["Louis Pilfold"],
         licenses: ["Apache 2.0"],
         links: %{"GitHub" => "https://github.com/lpil/pew"},
-        files: ~w(LICENCE README.md lib mix.exs)
+        files: ~w(LICENCE README.md priv lib mix.exs)
       ]
     ]
   end
@@ -34,9 +34,15 @@ defmodule Pew.Mixfile do
 
   defp deps do
     [
+      # SQL query helper
+      {:yesql, "~> 0.2"},
+      # Database driver
       {:postgrex, "~> 0.13"},
+      # JSON encoder
       {:jason, "~> 1.0-rc"},
+      # Automatic test tool
       {:mix_test_watch, ">= 0.0.0", only: :dev},
+      # Documentation generator
       {:ex_doc, "~> 0.18.0", only: :dev}
     ]
   end
